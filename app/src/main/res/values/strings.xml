@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">PhotoFilter</string>
+    <string name="label_upload_image">Upload image</string>
+</resources>
