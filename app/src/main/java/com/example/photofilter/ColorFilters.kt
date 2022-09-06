@@ -1,65 +1,92 @@
 package com.example.photofilter
 
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
-import androidx.constraintlayout.utils.widget.ImageFilterView
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.stateIn
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.drawable.Drawable
+import android.net.Uri
+import com.squareup.picasso.Picasso
+import com.squareup.picasso.Target
+import jp.wasabeef.picasso.transformations.gpu.*
 
 class PhotoFilter(
-    val name: String = "",
-    val filter: ImageFilterView.() -> Unit = { },
+    val name: String,
+    val bitmap: Bitmap?
 )
 
-// i need to subscribe for something to update image with effect and text,
-// but what exactly?
-class PhotoFilterHandler {
+class PhotoFilterHandler(
+    context: Context,
+    private val origUri: Uri,
+    private val onBitmapUpdated: (PhotoFilter) -> Unit
+) {
 
-    private val scope = CoroutineScope(Dispatchers.Main + Job())
+    private val filters = listOf(
+        SepiaFilterTransformation(context),
+        ToonFilterTransformation(context),
+        ContrastFilterTransformation(context),
+        InvertFilterTransformation(context),
+        PixelationFilterTransformation(context),
+        SketchFilterTransformation(context),
+        SwirlFilterTransformation(context),
+        BrightnessFilterTransformation(context),
+        KuwaharaFilterTransformation(context),
+        VignetteFilterTransformation(context)
+    )
 
     companion object {
         private const val LOWER_INDEX = 0
         private const val UPPER_INDEX = 10
     }
 
-    private var idx = MutableStateFlow(LOWER_INDEX)
+    private var idx = 0
 
-    fun nextFilter(): PhotoFilter {
-        idx.value = if (idx.value == UPPER_INDEX) 0 else idx.value++
-        return getFilterByIdx()
+    fun nextFilter() {
+        if (idx == UPPER_INDEX) idx = 0 else idx++
+        getFilterByIdx()
     }
 
-    fun previousFilter(): PhotoFilter {
-        idx.value = if (idx.value == LOWER_INDEX) 0 else idx.value--
-        return getFilterByIdx()
+    fun previousFilter() {
+        if (idx == LOWER_INDEX) idx = UPPER_INDEX else idx--
+        getFilterByIdx()
     }
 
-    private fun getFilterByIdx(): PhotoFilter {
-        return when (idx.value) {
-            0 -> PhotoFilter()
-            1 -> PhotoFilter("Sepia") { toSepia() }
-            else -> PhotoFilter()
+    private fun getFilterByIdx() {
+        when (idx) {
+            0 -> onDefaultImage()
+            1 -> getFilter("Sepia")
+            2 -> getFilter("Toon")
+            3 -> getFilter("Contrast")
+            4 -> getFilter("Invert")
+            5 -> getFilter("Pixelation")
+            6 -> getFilter("Sketch")
+            7 -> getFilter("Swirl")
+            8 -> getFilter("Brightness")
+            9 -> getFilter("Kuwahara")
+            10 -> getFilter("Vignette")
+            else -> onDefaultImage()
         }
     }
 
-}
+    private fun onDefaultImage() {
+        Picasso.get().load(origUri).into(labelTarget("Original"))
+    }
 
-fun ImageFilterView.toSepia() {
-    val matrixA = ColorMatrix()
-    // making image B&W
-    // making image B&W
-    matrixA.setSaturation(0f)
+    private fun getFilter(name: String) {
+        filters[idx - 1].applyFilter(name)
+    }
 
-    val matrixB = ColorMatrix()
-    // applying scales for RGB color values
-    // applying scales for RGB color values
-    matrixB.setScale(1f, .95f, .82f, 1.0f)
-    matrixA.setConcat(matrixB, matrixA)
+    private fun GPUFilterTransformation.applyFilter(name: String) =
+        Picasso.get().load(origUri).transform(this@applyFilter).into(labelTarget(name))
 
-    val filter = ColorMatrixColorFilter(matrixA)
-    this.colorFilter = filter
+    private fun labelTarget(name: String) = object : Target {
+        override fun onBitmapLoaded(bitmap: Bitmap?, from: Picasso.LoadedFrom?) {
+            val filter = PhotoFilter(name, bitmap)
+            onBitmapUpdated(filter)
+        }
+
+        override fun onBitmapFailed(e: Exception?, errorDrawable: Drawable?) {
+        }
+
+        override fun onPrepareLoad(placeHolderDrawable: Drawable?) {
+        }
+    }
 }

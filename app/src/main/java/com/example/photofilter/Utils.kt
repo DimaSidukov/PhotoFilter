@@ -2,11 +2,14 @@ package com.example.photofilter
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Bitmap
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import android.widget.ImageView
 import androidx.constraintlayout.utils.widget.ImageFilterView
+import com.squareup.picasso.Picasso
+import jp.wasabeef.picasso.transformations.gpu.GPUFilterTransformation
 import kotlin.math.abs
 
 open class OnSwipeTouchListener(context: Context?) : View.OnTouchListener {
