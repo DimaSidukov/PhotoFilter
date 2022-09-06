@@ -18,6 +18,13 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.utils.widget.ImageFilterView
 import androidx.core.app.ActivityCompat
 import com.google.android.material.button.MaterialButton
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 
 class MainActivity : AppCompatActivity() {
@@ -29,6 +36,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var imgBitmap: Bitmap
     private lateinit var photoFilterHandler: PhotoFilterHandler
 
+    private val scope = CoroutineScope(Dispatchers.IO + Job())
+    private var isImageLoaded = MutableStateFlow(false)
+
     private val activityResultLauncher = registerForActivityResult(StartActivityForResult()) {
         if (it.resultCode == Activity.RESULT_OK) {
             it.data?.data?.let { imgUri ->
@@ -39,6 +49,10 @@ class MainActivity : AppCompatActivity() {
                 else
                     MediaStore.Images.Media.getBitmap(contentResolver, imgUri)
                 photoFilterHandler = PhotoFilterHandler(this, imgUri, ::updateView)
+                scope.launch {
+                    isImageLoaded.emit(true)
+                }
+                imageView.setImageBitmap(null)
                 imageView.setImageBitmap(imgBitmap)
                 imageView.scaleType =
                     if (imgBitmap.height > imgBitmap.width) ScaleType.FIT_CENTER else ScaleType.FIT_START
@@ -67,21 +81,35 @@ class MainActivity : AppCompatActivity() {
             })
         }
 
-        imageView.onSwipe(
-            toLeft = {
-                photoFilterHandler.nextFilter()
-            },
-            toRight = {
-                photoFilterHandler.previousFilter()
+        scope.launch {
+            isImageLoaded.runOnUiIfTrue {
+                imageView.onSwipe(
+                    toLeft = {
+                        photoFilterHandler.nextFilter()
+                    },
+                    toRight = {
+                        photoFilterHandler.previousFilter()
+                    }
+                )
             }
-        )
+        }
+    }
+
+    private suspend fun StateFlow<Boolean>.runOnUiIfTrue(action: () -> Unit) = this.collectLatest {
+        if (it) runOnUiThread(action)
     }
 
     private fun updateView(photoFilter: PhotoFilter) {
         imageView.setImageBitmap(null)
         imageView.setImageBitmap(photoFilter.bitmap)
+        textView.setTextColor(
+            if (photoFilter.bitmap!!.getPixel(
+                    0,
+                    0
+                ).luminance < 227
+            ) Color.WHITE else Color.BLACK
+        )
         textView.text = photoFilter.name
-        textView.setTextColor(if (photoFilter.bitmap!!.getPixel(0, 0) < -100) Color.WHITE else Color.BLACK)
         textView.startAnimation(AlphaAnimation(0f, 0.8f).apply {
             duration = 500
             fillAfter = true

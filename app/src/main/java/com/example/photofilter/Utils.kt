@@ -2,14 +2,10 @@ package com.example.photofilter
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Bitmap
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
-import android.widget.ImageView
 import androidx.constraintlayout.utils.widget.ImageFilterView
-import com.squareup.picasso.Picasso
-import jp.wasabeef.picasso.transformations.gpu.GPUFilterTransformation
 import kotlin.math.abs
 
 open class OnSwipeTouchListener(context: Context?) : View.OnTouchListener {
@@ -70,3 +66,6 @@ fun ImageFilterView.onSwipe(toLeft: () -> Unit, toRight: () -> Unit) =
             toRight()
         }
     })
+
+val Int.luminance: Int
+    get() = 77 * (this shr 16 and 255) + 150 * (this shr 8 and 255) + 29 * (this and 255) shr 8
