@@ -11,13 +11,14 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.view.animation.AlphaAnimation
-import android.widget.ImageView.ScaleType
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
 import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.utils.widget.ImageFilterView
 import androidx.core.app.ActivityCompat
+import androidx.core.view.isVisible
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.slider.Slider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -29,11 +30,16 @@ import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
+    companion object {
+        const val SIZE_CONSTRAINT = 1000
+    }
+
     private lateinit var button: MaterialButton
     private lateinit var imageView: ImageFilterView
     private lateinit var textView: TextView
+    private lateinit var saturationSlider: Slider
+    private lateinit var warmthSlider: Slider
 
-    private lateinit var imgBitmap: Bitmap
     private lateinit var photoFilterHandler: PhotoFilterHandler
 
     private val scope = CoroutineScope(Dispatchers.IO + Job())
@@ -42,20 +48,31 @@ class MainActivity : AppCompatActivity() {
     private val activityResultLauncher = registerForActivityResult(StartActivityForResult()) {
         if (it.resultCode == Activity.RESULT_OK) {
             it.data?.data?.let { imgUri ->
-                imgBitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
+                val imgBitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
                     ImageDecoder.decodeBitmap(
                         ImageDecoder.createSource(contentResolver, imgUri)
                     )
                 else
                     MediaStore.Images.Media.getBitmap(contentResolver, imgUri)
-                photoFilterHandler = PhotoFilterHandler(this, imgUri, ::updateView)
+
+                val ratio =
+                    if (imgBitmap.width > SIZE_CONSTRAINT || imgBitmap.height > SIZE_CONSTRAINT) 1.2f else 1f
+                var size = Pair(imgBitmap.width, imgBitmap.height)
+
+                var width = size.first.toFloat()
+                var height = size.second.toFloat()
+                while (width > SIZE_CONSTRAINT.toFloat() && height > SIZE_CONSTRAINT.toFloat()) {
+                    width /= ratio
+                    height /= ratio
+                }
+                size = Pair(width.toInt(), height.toInt())
+                val newBitmap = Bitmap.createScaledBitmap(imgBitmap, size.first, size.second, true)
+
+                photoFilterHandler = PhotoFilterHandler(this, imgUri, size, ::updateView)
                 scope.launch {
                     isImageLoaded.emit(true)
                 }
-                imageView.setImageBitmap(null)
-                imageView.setImageBitmap(imgBitmap)
-                imageView.scaleType =
-                    if (imgBitmap.height > imgBitmap.width) ScaleType.FIT_CENTER else ScaleType.FIT_START
+                imageView.setImageBitmap(newBitmap)
             }
         }
     }
@@ -68,6 +85,8 @@ class MainActivity : AppCompatActivity() {
         button = findViewById(R.id.button)
         imageView = findViewById(R.id.filter_image)
         textView = findViewById(R.id.filter_name)
+        saturationSlider = findViewById(R.id.saturation_slider)
+        warmthSlider = findViewById(R.id.warmth_slider)
 
         ActivityCompat.requestPermissions(
             this,
@@ -91,7 +110,18 @@ class MainActivity : AppCompatActivity() {
                         photoFilterHandler.previousFilter()
                     }
                 )
+                saturationSlider.isVisible = true
+                warmthSlider.isVisible = true
+                saturationSlider.value = imageView.saturation
+                warmthSlider.value = imageView.warmth
             }
+        }
+
+        saturationSlider.addOnChangeListener { slider, value, fromUser ->
+            imageView.saturation = value
+        }
+        warmthSlider.addOnChangeListener { slider, value, fromUser ->
+            imageView.warmth = value
         }
     }
 
@@ -100,7 +130,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateView(photoFilter: PhotoFilter) {
-        imageView.setImageBitmap(null)
         imageView.setImageBitmap(photoFilter.bitmap)
         textView.setTextColor(
             if (photoFilter.bitmap!!.getPixel(

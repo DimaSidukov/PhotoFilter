@@ -4,9 +4,12 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import android.net.Uri
-import com.squareup.picasso.Picasso
-import com.squareup.picasso.Target
-import jp.wasabeef.picasso.transformations.gpu.*
+import com.bumptech.glide.Glide
+import com.bumptech.glide.request.RequestOptions
+import com.bumptech.glide.request.target.CustomTarget
+import com.bumptech.glide.request.transition.Transition
+import jp.wasabeef.glide.transformations.BlurTransformation
+import jp.wasabeef.glide.transformations.gpu.*
 
 class PhotoFilter(
     val name: String,
@@ -14,79 +17,71 @@ class PhotoFilter(
 )
 
 class PhotoFilterHandler(
-    context: Context,
+    private val context: Context,
     private val origUri: Uri,
+    private val size: Pair<Int, Int>,
     private val onBitmapUpdated: (PhotoFilter) -> Unit
 ) {
 
     private val filters = listOf(
-        SepiaFilterTransformation(context),
-        ToonFilterTransformation(context),
-        ContrastFilterTransformation(context),
-        InvertFilterTransformation(context),
-        PixelationFilterTransformation(context),
-        SketchFilterTransformation(context),
-        SwirlFilterTransformation(context),
-        BrightnessFilterTransformation(context),
-        KuwaharaFilterTransformation(context),
-        VignetteFilterTransformation(context)
+        Pair(SepiaFilterTransformation(), "Sepia"),
+        Pair(ToonFilterTransformation(), "Toon"),
+        Pair(ContrastFilterTransformation(), "Contrast"),
+        Pair(InvertFilterTransformation(), "Invert"),
+        Pair(PixelationFilterTransformation(), "Pixelation"),
+        Pair(SketchFilterTransformation(), "Sketch"),
+        Pair(SwirlFilterTransformation(), "Swirl"),
+        Pair(BrightnessFilterTransformation(), "Brightness"),
+        Pair(KuwaharaFilterTransformation(), "Kuwahara"),
+        Pair(VignetteFilterTransformation(), "Vignette"),
+        Pair(BlurTransformation(), "Blur")
     )
 
     companion object {
         private const val LOWER_INDEX = 0
-        private const val UPPER_INDEX = 10
     }
 
     private var idx = 0
 
     fun nextFilter() {
-        if (idx == UPPER_INDEX) idx = 0 else idx++
+        if (idx == filters.size) idx = 0 else idx++
         getFilterByIdx()
     }
 
     fun previousFilter() {
-        if (idx == LOWER_INDEX) idx = UPPER_INDEX else idx--
+        if (idx == LOWER_INDEX) idx = filters.size else idx--
         getFilterByIdx()
     }
 
     private fun getFilterByIdx() {
         when (idx) {
-            0 -> onDefaultImage()
-            1 -> getFilter("Sepia")
-            2 -> getFilter("Toon")
-            3 -> getFilter("Contrast")
-            4 -> getFilter("Invert")
-            5 -> getFilter("Pixelation")
-            6 -> getFilter("Sketch")
-            7 -> getFilter("Swirl")
-            8 -> getFilter("Brightness")
-            9 -> getFilter("Kuwahara")
-            10 -> getFilter("Vignette")
-            else -> onDefaultImage()
+            0 -> {
+                Glide.with(context)
+                    .asBitmap()
+                    .load(origUri)
+                    .apply(RequestOptions().override(size.first, size.second))
+                    .into(labelTarget("Original"))
+            }
+            else -> setFilter(idx - 1)
         }
     }
 
-    private fun onDefaultImage() {
-        Picasso.get().load(origUri).into(labelTarget("Original"))
+    private fun setFilter(filterIdx: Int) {
+        Glide.with(context)
+            .asBitmap()
+            .load(origUri)
+            .apply(RequestOptions().override(size.first, size.second))
+            .transform(filters[filterIdx].first)
+            .into(labelTarget(filters[filterIdx].second))
     }
 
-    private fun getFilter(name: String) {
-        filters[idx - 1].applyFilter(name)
-    }
-
-    private fun GPUFilterTransformation.applyFilter(name: String) =
-        Picasso.get().load(origUri).transform(this@applyFilter).into(labelTarget(name))
-
-    private fun labelTarget(name: String) = object : Target {
-        override fun onBitmapLoaded(bitmap: Bitmap?, from: Picasso.LoadedFrom?) {
-            val filter = PhotoFilter(name, bitmap)
+    private fun labelTarget(name: String) = object : CustomTarget<Bitmap>() {
+        override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
+            val filter = PhotoFilter(name, resource)
             onBitmapUpdated(filter)
         }
 
-        override fun onBitmapFailed(e: Exception?, errorDrawable: Drawable?) {
-        }
-
-        override fun onPrepareLoad(placeHolderDrawable: Drawable?) {
+        override fun onLoadCleared(placeholder: Drawable?) {
         }
     }
 }
