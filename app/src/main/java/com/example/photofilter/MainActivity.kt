@@ -10,8 +10,10 @@ import android.graphics.ImageDecoder
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.util.Log
 import android.view.animation.AlphaAnimation
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
 import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.utils.widget.ImageFilterView
@@ -19,19 +21,24 @@ import androidx.core.app.ActivityCompat
 import androidx.core.view.isVisible
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.slider.Slider
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import com.yandex.mobile.ads.banner.AdSize
+import com.yandex.mobile.ads.banner.BannerAdEventListener
+import com.yandex.mobile.ads.banner.BannerAdView
+import com.yandex.mobile.ads.common.AdRequest
+import com.yandex.mobile.ads.common.AdRequestError
+import com.yandex.mobile.ads.common.ImpressionData
+import com.yandex.mobile.ads.interstitial.InterstitialAd
+import com.yandex.mobile.ads.interstitial.InterstitialAdEventListener
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
-
 
 class MainActivity : AppCompatActivity() {
 
     companion object {
         const val SIZE_CONSTRAINT = 1000
+        const val INTERSTITIAL_DELAY = 30_000L
     }
 
     private lateinit var button: MaterialButton
@@ -39,11 +46,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var textView: TextView
     private lateinit var saturationSlider: Slider
     private lateinit var warmthSlider: Slider
-
+    private lateinit var banner: BannerAdView
     private lateinit var photoFilterHandler: PhotoFilterHandler
+    private var interstitialAd: InterstitialAd? = null
 
-    private val scope = CoroutineScope(Dispatchers.IO + Job())
+    private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var isImageLoaded = MutableStateFlow(false)
+    private var shouldShowInterstitial = MutableStateFlow(true)
 
     private val activityResultLauncher = registerForActivityResult(StartActivityForResult()) {
         if (it.resultCode == Activity.RESULT_OK) {
@@ -88,6 +97,9 @@ class MainActivity : AppCompatActivity() {
         saturationSlider = findViewById(R.id.saturation_slider)
         warmthSlider = findViewById(R.id.warmth_slider)
 
+        loadBanner()
+        loadInterstitial()
+
         ActivityCompat.requestPermissions(
             this,
             arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
@@ -116,11 +128,19 @@ class MainActivity : AppCompatActivity() {
                 warmthSlider.value = imageView.warmth
             }
         }
+        scope.launch {
+            shouldShowInterstitial.collectLatest {
+                if (it) {
+                    delay(INTERSTITIAL_DELAY)
+                    interstitialAd?.loadAd(AdRequest.Builder().build())
+                }
+            }
+        }
 
-        saturationSlider.addOnChangeListener { slider, value, fromUser ->
+        saturationSlider.addOnChangeListener { _, value, _ ->
             imageView.saturation = value
         }
-        warmthSlider.addOnChangeListener { slider, value, fromUser ->
+        warmthSlider.addOnChangeListener { _, value, _ ->
             imageView.warmth = value
         }
     }
@@ -147,6 +167,76 @@ class MainActivity : AppCompatActivity() {
             startOffset = 500
             duration = 500
             fillAfter = true
+        })
+    }
+
+    private fun loadBanner() {
+        banner = findViewById(R.id.banner_view)
+        banner.setAdUnitId("R-M-338228-20")
+        banner.setAdSize(AdSize.flexibleSize(320, 50))
+        banner.setBannerAdEventListener(object : BannerAdEventListener {
+            override fun onAdLoaded() {
+            }
+
+            override fun onAdFailedToLoad(p0: AdRequestError) {
+                Toast.makeText(this@MainActivity, p0.description, Toast.LENGTH_SHORT).show()
+                Log.e("ERROR", p0.description)
+            }
+
+            override fun onAdClicked() {
+
+            }
+
+            override fun onLeftApplication() {
+
+            }
+
+            override fun onReturnedToApplication() {
+            }
+
+            override fun onImpression(p0: ImpressionData?) {
+
+            }
+        })
+        banner.loadAd(AdRequest.Builder().build())
+    }
+
+    private fun loadInterstitial() {
+        interstitialAd = InterstitialAd(this)
+        interstitialAd?.setAdUnitId("R-M-DEMO-interstitial")
+        interstitialAd?.setInterstitialAdEventListener(object : InterstitialAdEventListener {
+            override fun onAdLoaded() {
+                scope.launch { shouldShowInterstitial.emit(false) }
+                interstitialAd?.show()
+            }
+
+            override fun onAdFailedToLoad(p0: AdRequestError) {
+
+            }
+
+            override fun onAdShown() {
+
+            }
+
+            override fun onAdDismissed() {
+                scope.launch { shouldShowInterstitial.emit(true) }
+            }
+
+            override fun onAdClicked() {
+
+            }
+
+            override fun onLeftApplication() {
+
+            }
+
+            override fun onReturnedToApplication() {
+
+            }
+
+            override fun onImpression(p0: ImpressionData?) {
+
+            }
         })
     }
 }
