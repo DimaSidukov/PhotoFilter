@@ -16,7 +16,6 @@
         android:paddingVertical="10dp"
         android:text="@string/label_upload_image"
         android:textAllCaps="false"
-        android:textSize="16sp"
         app:cornerRadius="15dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
@@ -71,20 +70,54 @@
             android:layout_below="@id/saturation_slider"
             android:layout_marginHorizontal="50dp"
             android:visibility="invisible"
-            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintBottom_toBottomOf="@id/button_apply_effects"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/saturation_slider" />
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
-
-        <com.yandex.mobile.ads.banner.BannerAdView
-            android:id="@+id/banner_view"
-            app:layout_constraintTop_toBottomOf="@+id/filter_layout"
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_apply_effects"
+            android:visibility="invisible"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:fontFamily="sans-serif-light"
+            android:paddingVertical="10dp"
+            android:textSize="16sp"
+            app:cornerRadius="15dp"
+            android:text="@string/apply_effects"
+            android:textAllCaps="false"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/save_image_button"
             app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/warmth_slider" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/save_image_button"
+            android:visibility="invisible"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:fontFamily="sans-serif-light"
+            android:paddingVertical="10dp"
+            android:textSize="16sp"
+            app:cornerRadius="15dp"
+            android:text="@string/save_image"
+            android:textAllCaps="false"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content" />
+            app:layout_constraintStart_toEndOf="@id/button_apply_effects"
+            app:layout_constraintTop_toBottomOf="@id/warmth_slider" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <com.yandex.mobile.ads.banner.BannerAdView
+        android:id="@+id/banner_view"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/filter_layout" />
 
 
 </androidx.constraintlayout.widget.ConstraintLayout>

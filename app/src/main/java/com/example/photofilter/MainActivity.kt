@@ -9,6 +9,7 @@ import android.graphics.Color
 import android.graphics.ImageDecoder
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import android.view.animation.AlphaAnimation
@@ -18,6 +19,8 @@ import androidx.activity.result.contract.ActivityResultContracts.StartActivityFo
 import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.utils.widget.ImageFilterView
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
 import androidx.core.view.isVisible
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.slider.Slider
@@ -33,6 +36,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import java.io.File
+import java.io.FileOutputStream
 
 class MainActivity : AppCompatActivity() {
 
@@ -42,10 +47,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private lateinit var button: MaterialButton
+    private lateinit var applyEffectsButton: MaterialButton
+    private lateinit var saveImageButton: MaterialButton
     private lateinit var imageView: ImageFilterView
     private lateinit var textView: TextView
-    private lateinit var saturationSlider: Slider
-    private lateinit var warmthSlider: Slider
+    private lateinit var firstParamSlider: Slider
+    private lateinit var secondParamSlider: Slider
     private lateinit var banner: BannerAdView
     private lateinit var photoFilterHandler: PhotoFilterHandler
     private var interstitialAd: InterstitialAd? = null
@@ -92,10 +99,12 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         button = findViewById(R.id.button)
+        applyEffectsButton = findViewById(R.id.button_apply_effects)
+        saveImageButton = findViewById(R.id.save_image_button)
         imageView = findViewById(R.id.filter_image)
         textView = findViewById(R.id.filter_name)
-        saturationSlider = findViewById(R.id.saturation_slider)
-        warmthSlider = findViewById(R.id.warmth_slider)
+        firstParamSlider = findViewById(R.id.saturation_slider)
+        secondParamSlider = findViewById(R.id.warmth_slider)
 
         loadBanner()
         loadInterstitial()
@@ -112,36 +121,58 @@ class MainActivity : AppCompatActivity() {
             })
         }
 
+        applyEffectsButton.setOnClickListener {
+            photoFilterHandler.updateCurrentFilter(firstParamSlider.value, secondParamSlider.value)
+        }
+
+        saveImageButton.setOnClickListener {
+            val img = imageView.drawable.toBitmap()
+
+            val storage = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+            val file = File(storage, "image.jpg")
+
+            try {
+                val fos = FileOutputStream(file)
+                img.compress(Bitmap.CompressFormat.JPEG, 100, fos)
+                fos.close()
+
+                Toast.makeText(this, "Image saved!", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this, e.message, Toast.LENGTH_SHORT).show()
+            }
+        }
+
         scope.launch {
             isImageLoaded.runOnUiIfTrue {
                 imageView.onSwipe(
                     toLeft = {
-                        photoFilterHandler.nextFilter()
+                        photoFilterHandler.nextFilter { a, b ->
+                            firstParamSlider.value = a
+                            secondParamSlider.value = b
+                        }
                     },
                     toRight = {
-                        photoFilterHandler.previousFilter()
+                        photoFilterHandler.previousFilter { a, b ->
+                            firstParamSlider.value = a
+                            secondParamSlider.value = b
+                        }
                     }
                 )
-                saturationSlider.isVisible = true
-                warmthSlider.isVisible = true
-                saturationSlider.value = imageView.saturation
-                warmthSlider.value = imageView.warmth
+                firstParamSlider.isVisible = true
+                secondParamSlider.isVisible = true
+                applyEffectsButton.isVisible = true
+                saveImageButton.isVisible = true
+                firstParamSlider.value = imageView.saturation
+                secondParamSlider.value = imageView.warmth
             }
         }
         scope.launch {
             shouldShowInterstitial.collectLatest {
                 if (it) {
                     delay(INTERSTITIAL_DELAY)
-                    interstitialAd?.loadAd(AdRequest.Builder().build())
+                    // interstitialAd?.loadAd(AdRequest.Builder().build())
                 }
             }
-        }
-
-        saturationSlider.addOnChangeListener { _, value, _ ->
-            imageView.saturation = value
-        }
-        warmthSlider.addOnChangeListener { _, value, _ ->
-            imageView.warmth = value
         }
     }
 
